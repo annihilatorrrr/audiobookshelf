@@ -38,7 +38,8 @@ export default {
     currentChapter: {
       type: Object,
       default: () => {}
-    }
+    },
+    playbackRate: Number
   },
   data() {
     return {
@@ -56,13 +57,16 @@ export default {
   },
   watch: {
     duration: {
-      immediate: true,
       handler() {
         this.setChapterTicks()
       }
     }
   },
   computed: {
+    _playbackRate() {
+      if (!this.playbackRate || isNaN(this.playbackRate)) return 1
+      return this.playbackRate
+    },
     currentChapterDuration() {
       if (!this.currentChapter) return 0
       return this.currentChapter.end - this.currentChapter.start
@@ -81,8 +85,8 @@ export default {
     clickTrack(e) {
       if (this.loading) return
 
-      var offsetX = e.offsetX
-      var perc = offsetX / this.trackWidth
+      const offsetX = e.offsetX
+      const perc = offsetX / this.trackWidth
       const baseTime = this.useChapterTrack ? this.currentChapterStart : 0
       const duration = this.useChapterTrack ? this.currentChapterDuration : this.duration
       const time = baseTime + perc * duration
@@ -111,7 +115,7 @@ export default {
       this.updateReadyTrack()
     },
     updateReadyTrack() {
-      var widthReady = Math.round(this.trackWidth * this.percentReady)
+      const widthReady = Math.round(this.trackWidth * this.percentReady)
       if (this.readyTrackWidth === widthReady) return
       this.readyTrackWidth = widthReady
       if (this.$refs.readyTrack) this.$refs.readyTrack.style.width = widthReady + 'px'
@@ -124,7 +128,7 @@ export default {
       const time = this.useChapterTrack ? Math.max(0, this.currentTime - this.currentChapterStart) : this.currentTime
       const duration = this.useChapterTrack ? this.currentChapterDuration : this.duration
 
-      var ptWidth = Math.round((time / duration) * this.trackWidth)
+      const ptWidth = Math.round((time / duration) * this.trackWidth)
       if (this.playedTrackWidth === ptWidth) {
         return
       }
@@ -133,7 +137,7 @@ export default {
     },
     setChapterTicks() {
       this.chapterTicks = this.chapters.map((chap) => {
-        var perc = chap.start / this.duration
+        const perc = chap.start / this.duration
         return {
           title: chap.title,
           left: perc * this.trackWidth
@@ -141,7 +145,7 @@ export default {
       })
     },
     mousemoveTrack(e) {
-      var offsetX = e.offsetX
+      const offsetX = e.offsetX
 
       const baseTime = this.useChapterTrack ? this.currentChapterStart : 0
       const duration = this.useChapterTrack ? this.currentChapterDuration : this.duration
@@ -167,7 +171,7 @@ export default {
         this.$refs.hoverTimestampArrow.style.left = posLeft + 'px'
       }
       if (this.$refs.hoverTimestampText) {
-        var hoverText = this.$secondsToTimestamp(progressTime)
+        var hoverText = this.$secondsToTimestamp(progressTime / this._playbackRate)
 
         var chapter = this.chapters.find((chapter) => chapter.start <= totalTime && totalTime < chapter.end)
         if (chapter && chapter.title) {
@@ -200,10 +204,14 @@ export default {
     },
     windowResize() {
       this.setTrackWidth()
+      this.setChapterTicks()
+      this.updatePlayedTrackWidth()
+      this.updateBufferTrack()
     }
   },
   mounted() {
     this.setTrackWidth()
+    this.setChapterTicks()
     window.addEventListener('resize', this.windowResize)
   },
   beforeDestroy() {

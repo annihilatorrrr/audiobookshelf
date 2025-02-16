@@ -1,11 +1,15 @@
 class AudioMetaTags {
   constructor(metadata) {
     this.tagAlbum = null
+    this.tagAlbumSort = null
     this.tagArtist = null
+    this.tagArtistSort = null
     this.tagGenre = null
     this.tagTitle = null
+    this.tagTitleSort = null
     this.tagSeries = null
     this.tagSeriesPart = null
+    this.tagGrouping = null
     this.tagTrack = null
     this.tagDisc = null
     this.tagSubtitle = null
@@ -20,6 +24,9 @@ class AudioMetaTags {
     this.tagIsbn = null
     this.tagLanguage = null
     this.tagASIN = null
+    this.tagItunesId = null
+    this.tagPodcastType = null
+    this.tagEpisodeType = null
     this.tagOverdriveMediaMarker = null
     this.tagOriginalYear = null
     this.tagReleaseCountry = null
@@ -55,7 +62,7 @@ class AudioMetaTags {
 
     // Track ID3 tag might be "3/10" or just "3"
     if (this.tagTrack) {
-      const trackParts = this.tagTrack.split('/').map(part => Number(part))
+      const trackParts = this.tagTrack.split('/').map((part) => Number(part))
       if (trackParts.length > 0) {
         // Fractional track numbers not supported
         data.number = !isNaN(trackParts[0]) ? Math.trunc(trackParts[0]) : null
@@ -75,7 +82,7 @@ class AudioMetaTags {
     }
 
     if (this.tagDisc) {
-      const discParts = this.tagDisc.split('/').map(p => Number(p))
+      const discParts = this.tagDisc.split('/').map((p) => Number(p))
       if (discParts.length > 0) {
         data.number = !isNaN(discParts[0]) ? Math.trunc(discParts[0]) : null
       }
@@ -87,18 +94,30 @@ class AudioMetaTags {
     return data
   }
 
-  get discNumber() { return this.discNumAndTotal.number }
-  get discTotal() { return this.discNumAndTotal.total }
-  get trackNumber() { return this.trackNumAndTotal.number }
-  get trackTotal() { return this.trackNumAndTotal.total }
+  get discNumber() {
+    return this.discNumAndTotal.number
+  }
+  get discTotal() {
+    return this.discNumAndTotal.total
+  }
+  get trackNumber() {
+    return this.trackNumAndTotal.number
+  }
+  get trackTotal() {
+    return this.trackNumAndTotal.total
+  }
 
   construct(metadata) {
     this.tagAlbum = metadata.tagAlbum || null
+    this.tagAlbumSort = metadata.tagAlbumSort || null
     this.tagArtist = metadata.tagArtist || null
+    this.tagArtistSort = metadata.tagArtistSort || null
     this.tagGenre = metadata.tagGenre || null
     this.tagTitle = metadata.tagTitle || null
+    this.tagTitleSort = metadata.tagTitleSort || null
     this.tagSeries = metadata.tagSeries || null
     this.tagSeriesPart = metadata.tagSeriesPart || null
+    this.tagGrouping = metadata.tagGrouping || null
     this.tagTrack = metadata.tagTrack || null
     this.tagDisc = metadata.tagDisc || null
     this.tagSubtitle = metadata.tagSubtitle || null
@@ -113,6 +132,9 @@ class AudioMetaTags {
     this.tagIsbn = metadata.tagIsbn || null
     this.tagLanguage = metadata.tagLanguage || null
     this.tagASIN = metadata.tagASIN || null
+    this.tagItunesId = metadata.tagItunesId || null
+    this.tagPodcastType = metadata.tagPodcastType || null
+    this.tagEpisodeType = metadata.tagEpisodeType || null
     this.tagOverdriveMediaMarker = metadata.tagOverdriveMediaMarker || null
     this.tagOriginalYear = metadata.tagOriginalYear || null
     this.tagReleaseCountry = metadata.tagReleaseCountry || null
@@ -128,11 +150,15 @@ class AudioMetaTags {
   // Data parsed in prober.js
   setData(payload) {
     this.tagAlbum = payload.file_tag_album || null
+    this.tagAlbumSort = payload.file_tag_albumsort || null
     this.tagArtist = payload.file_tag_artist || null
+    this.tagArtistSort = payload.file_tag_artistsort || null
     this.tagGenre = payload.file_tag_genre || null
     this.tagTitle = payload.file_tag_title || null
+    this.tagTitleSort = payload.file_tag_titlesort || null
     this.tagSeries = payload.file_tag_series || null
     this.tagSeriesPart = payload.file_tag_seriespart || null
+    this.tagGrouping = payload.file_tag_grouping || null
     this.tagTrack = payload.file_tag_track || null
     this.tagDisc = payload.file_tag_disc || null
     this.tagSubtitle = payload.file_tag_subtitle || null
@@ -147,6 +173,9 @@ class AudioMetaTags {
     this.tagIsbn = payload.file_tag_isbn || null
     this.tagLanguage = payload.file_tag_language || null
     this.tagASIN = payload.file_tag_asin || null
+    this.tagItunesId = payload.file_tag_itunesid || null
+    this.tagPodcastType = payload.file_tag_podcasttype || null
+    this.tagEpisodeType = payload.file_tag_episodetype || null
     this.tagOverdriveMediaMarker = payload.file_tag_overdrive_media_marker || null
     this.tagOriginalYear = payload.file_tag_originalyear || null
     this.tagReleaseCountry = payload.file_tag_releasecountry || null
@@ -159,18 +188,18 @@ class AudioMetaTags {
     this.tagMusicBrainzArtistId = payload.file_tag_musicbrainz_artistid || null
   }
 
-  setDataFromTone(tags) {
-    // TODO: Implement
-  }
-
   updateData(payload) {
     const dataMap = {
       tagAlbum: payload.file_tag_album || null,
+      tagAlbumSort: payload.file_tag_albumsort || null,
       tagArtist: payload.file_tag_artist || null,
+      tagArtistSort: payload.file_tag_artistsort || null,
       tagGenre: payload.file_tag_genre || null,
       tagTitle: payload.file_tag_title || null,
+      tagTitleSort: payload.file_tag_titlesort || null,
       tagSeries: payload.file_tag_series || null,
       tagSeriesPart: payload.file_tag_seriespart || null,
+      tagGrouping: payload.file_tag_grouping || null,
       tagTrack: payload.file_tag_track || null,
       tagDisc: payload.file_tag_disc || null,
       tagSubtitle: payload.file_tag_subtitle || null,
@@ -185,6 +214,9 @@ class AudioMetaTags {
       tagIsbn: payload.file_tag_isbn || null,
       tagLanguage: payload.file_tag_language || null,
       tagASIN: payload.file_tag_asin || null,
+      tagItunesId: payload.file_tag_itunesid || null,
+      tagPodcastType: payload.file_tag_podcasttype || null,
+      tagEpisodeType: payload.file_tag_episodetype || null,
       tagOverdriveMediaMarker: payload.file_tag_overdrive_media_marker || null,
       tagOriginalYear: payload.file_tag_originalyear || null,
       tagReleaseCountry: payload.file_tag_releasecountry || null,

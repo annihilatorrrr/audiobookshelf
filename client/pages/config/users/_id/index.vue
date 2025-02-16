@@ -4,7 +4,7 @@
       <nuxt-link to="/config/users" class="text-white text-opacity-70 hover:text-opacity-100 hover:bg-white hover:bg-opacity-5 cursor-pointer rounded-full px-2 sm:px-0">
         <div class="flex items-center">
           <div class="h-10 w-10 flex items-center justify-center">
-            <span class="material-icons text-2xl">arrow_back</span>
+            <span class="material-symbols text-2xl">arrow_back</span>
           </div>
           <p class="pl-1">{{ $strings.LabelAllUsers }}</p>
         </div>
@@ -14,11 +14,7 @@
         <h1 class="text-xl pl-2">{{ username }}</h1>
       </div>
       <div v-if="userToken" class="flex text-xs mt-4">
-        <ui-text-input-with-label label="API Token" :value="userToken" readonly />
-
-        <div class="px-1 mt-8 cursor-pointer" @click="copyToClipboard(userToken)">
-          <span class="material-icons pl-2 text-base">content_copy</span>
-        </div>
+        <ui-text-input-with-label :label="$strings.LabelApiToken" :value="userToken" readonly show-copy />
       </div>
       <div class="w-full h-px bg-white bg-opacity-10 my-2" />
       <div class="py-2">
@@ -47,13 +43,7 @@
       <div class="py-2">
         <h1 class="text-lg mb-2 text-white text-opacity-90 px-2 sm:px-0">{{ $strings.HeaderSavedMediaProgress }}</h1>
 
-        <div v-if="mediaProgressWithoutMedia.length" class="flex items-center py-2 mb-2">
-          <p class="text-error">User has media progress for {{ mediaProgressWithoutMedia.length }} items that no longer exist.</p>
-          <div class="flex-grow" />
-          <ui-btn small :loading="purgingMediaProgress" @click.stop="purgeMediaProgress">{{ $strings.ButtonPurgeMediaProgress }}</ui-btn>
-        </div>
-
-        <table v-if="mediaProgressWithMedia.length" class="userAudiobooksTable">
+        <table v-if="mediaProgress.length" class="userAudiobooksTable">
           <tr class="bg-primary bg-opacity-40">
             <th class="w-16 text-left">{{ $strings.LabelItem }}</th>
             <th class="text-left"></th>
@@ -61,30 +51,25 @@
             <th class="w-40 hidden sm:table-cell">{{ $strings.LabelStartedAt }}</th>
             <th class="w-40 hidden sm:table-cell">{{ $strings.LabelLastUpdate }}</th>
           </tr>
-          <tr v-for="item in mediaProgressWithMedia" :key="item.id" :class="!item.isFinished ? '' : 'isFinished'">
+          <tr v-for="item in mediaProgress" :key="item.id" :class="!item.isFinished ? '' : 'isFinished'">
             <td>
-              <covers-book-cover :width="50" :library-item="item" :book-cover-aspect-ratio="bookCoverAspectRatio" />
+              <covers-preview-cover v-if="item.coverPath" :width="50" :src="$store.getters['globals/getLibraryItemCoverSrcById'](item.libraryItemId, item.mediaUpdatedAt)" :book-cover-aspect-ratio="bookCoverAspectRatio" :show-resolution="false" />
+              <div v-else class="bg-primary flex items-center justify-center text-center text-xs text-gray-400 p-1" :style="{ width: '50px', height: 50 * bookCoverAspectRatio + 'px' }">No Cover</div>
             </td>
             <td>
-              <template v-if="item.media && item.media.metadata && item.episode">
-                <p>{{ item.episode.title || 'Unknown' }}</p>
-                <p class="text-white text-opacity-50 text-sm font-sans">{{ item.media.metadata.title }}</p>
-              </template>
-              <template v-else-if="item.media && item.media.metadata">
-                <p>{{ item.media.metadata.title || 'Unknown' }}</p>
-                <p v-if="item.media.metadata.authorName" class="text-white text-opacity-50 text-sm font-sans">by {{ item.media.metadata.authorName }}</p>
-              </template>
+              <p>{{ item.displayTitle || 'Unknown' }}</p>
+              <p v-if="item.displaySubtitle" class="text-white text-opacity-50 text-sm font-sans">{{ item.displaySubtitle }}</p>
             </td>
             <td class="text-center">
               <p class="text-sm">{{ Math.floor(item.progress * 100) }}%</p>
             </td>
             <td class="text-center hidden sm:table-cell">
-              <ui-tooltip v-if="item.startedAt" direction="top" :text="$formatDate(item.startedAt, 'MMMM do, yyyy HH:mm')">
+              <ui-tooltip v-if="item.startedAt" direction="top" :text="$formatDatetime(item.startedAt, dateFormat, timeFormat)">
                 <p class="text-sm">{{ $dateDistanceFromNow(item.startedAt) }}</p>
               </ui-tooltip>
             </td>
             <td class="text-center hidden sm:table-cell">
-              <ui-tooltip v-if="item.lastUpdate" direction="top" :text="$formatDate(item.lastUpdate, 'MMMM do, yyyy HH:mm')">
+              <ui-tooltip v-if="item.lastUpdate" direction="top" :text="$formatDatetime(item.lastUpdate, dateFormat, timeFormat)">
                 <p class="text-sm">{{ $dateDistanceFromNow(item.lastUpdate) }}</p>
               </ui-tooltip>
             </td>
@@ -111,8 +96,7 @@ export default {
   data() {
     return {
       listeningSessions: {},
-      listeningStats: {},
-      purgingMediaProgress: false
+      listeningStats: {}
     }
   },
   computed: {
@@ -131,12 +115,6 @@ export default {
     mediaProgress() {
       return this.user.mediaProgress.sort((a, b) => b.lastUpdate - a.lastUpdate)
     },
-    mediaProgressWithMedia() {
-      return this.mediaProgress.filter((mp) => mp.media)
-    },
-    mediaProgressWithoutMedia() {
-      return this.mediaProgress.filter((mp) => !mp.media)
-    },
     totalListeningTime() {
       return this.listeningStats.totalTime || 0
     },
@@ -149,12 +127,15 @@ export default {
     latestSession() {
       if (!this.listeningSessions.sessions || !this.listeningSessions.sessions.length) return null
       return this.listeningSessions.sessions[0]
+    },
+    dateFormat() {
+      return this.$store.state.serverSettings.dateFormat
+    },
+    timeFormat() {
+      return this.$store.state.serverSettings.timeFormat
     }
   },
   methods: {
-    copyToClipboard(str) {
-      this.$copyToClipboard(str, this)
-    },
     async init() {
       this.listeningSessions = await this.$axios
         .$get(`/api/users/${this.user.id}/listening-sessions?page=0&itemsPerPage=10`)
@@ -170,24 +151,6 @@ export default {
         return []
       })
       console.log('Loaded user listening data', this.listeningSessions, this.listeningStats)
-    },
-    purgeMediaProgress() {
-      this.purgingMediaProgress = true
-
-      this.$axios
-        .$post(`/api/users/${this.user.id}/purge-media-progress`)
-        .then((updatedUser) => {
-          console.log('Updated user', updatedUser)
-          this.$toast.success('Media progress purged')
-          this.user = updatedUser
-        })
-        .catch((error) => {
-          console.error('Failed to purge media progress', error)
-          this.$toast.error('Failed to purge media progress')
-        })
-        .finally(() => {
-          this.purgingMediaProgress = false
-        })
     }
   },
   mounted() {

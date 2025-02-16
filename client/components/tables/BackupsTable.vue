@@ -1,5 +1,5 @@
 <template>
-  <div class="text-center mt-4">
+  <div class="text-center mt-4 relative">
     <div class="flex py-4">
       <ui-file-input ref="fileInput" class="mr-2" accept=".audiobookshelf" @change="backupUploaded">{{ $strings.ButtonUploadBackup }}</ui-file-input>
       <div class="flex-grow" />
@@ -17,18 +17,18 @@
           <td>
             <p class="truncate text-xs sm:text-sm md:text-base">/{{ backup.path.replace(/\\/g, '/') }}</p>
           </td>
-          <td class="hidden sm:table-cell font-sans text-sm">{{ backup.datePretty }}</td>
+          <td class="hidden sm:table-cell font-sans text-sm">{{ $formatDatetime(backup.createdAt, dateFormat, timeFormat) }}</td>
           <td class="hidden sm:table-cell font-mono md:text-sm text-xs">{{ $bytesPretty(backup.fileSize) }}</td>
           <td>
             <div class="w-full flex flex-row items-center justify-center">
-              <ui-btn v-if="backup.serverVersion" small color="primary" @click="applyBackup(backup)">{{ $strings.ButtonRestore }}</ui-btn>
-
-              <a v-if="backup.serverVersion" :href="`/metadata/${$encodeUriPath(backup.path)}?token=${userToken}`" class="mx-1 pt-1 hover:text-opacity-100 text-opacity-70 text-white" download><span class="material-icons text-xl">download</span></a>
+              <ui-btn v-if="backup.serverVersion && backup.key" small color="primary" @click="applyBackup(backup)">{{ $strings.ButtonRestore }}</ui-btn>
               <ui-tooltip v-else text="This backup was created with an old version of audiobookshelf no longer supported" direction="bottom" class="mx-2 flex items-center">
-                <span class="material-icons-outlined text-2xl text-error">error_outline</span>
+                <span class="material-symbols text-2xl text-error">error_outline</span>
               </ui-tooltip>
 
-              <span class="material-icons text-xl hover:text-error hover:text-opacity-100 text-opacity-70 text-white cursor-pointer mx-1" @click="deleteBackupClick(backup)">delete</span>
+              <button aria-label="Download Backup" class="inline-flex material-symbols text-xl mx-1 mt-1 text-white/70 hover:text-white/100" @click.stop="downloadBackup(backup)">download</button>
+
+              <button aria-label="Delete Backup" class="inline-flex material-symbols text-xl mx-1 text-white/70 hover:text-error" @click="deleteBackupClick(backup)">delete</button>
             </div>
           </td>
         </tr>
@@ -46,7 +46,7 @@
         <p class="text-error text-lg font-semibold">{{ $strings.MessageImportantNotice }}</p>
         <p class="text-base py-1" v-html="$strings.MessageRestoreBackupWarning" />
 
-        <p class="text-lg text-center my-8">{{ $strings.MessageRestoreBackupConfirm }} {{ selectedBackup.datePretty }}?</p>
+        <p class="text-lg text-center my-8">{{ $strings.MessageRestoreBackupConfirm }} {{ $formatDatetime(selectedBackup.createdAt, dateFormat, timeFormat) }}?</p>
         <div class="flex px-1 items-center">
           <ui-btn color="primary" @click="showConfirmApply = false">{{ $strings.ButtonNevermind }}</ui-btn>
           <div class="flex-grow" />
@@ -54,6 +54,10 @@
         </div>
       </div>
     </prompt-dialog>
+
+    <div v-if="isApplyingBackup" class="absolute inset-0 w-full h-full flex items-center justify-center bg-black/20 rounded-md">
+      <ui-loading-indicator />
+    </div>
   </div>
 </template>
 
@@ -64,6 +68,7 @@ export default {
       showConfirmApply: false,
       selectedBackup: null,
       isBackingUp: false,
+      isApplyingBackup: false,
       processing: false,
       backups: []
     }
@@ -71,26 +76,38 @@ export default {
   computed: {
     userToken() {
       return this.$store.getters['user/getToken']
+    },
+    dateFormat() {
+      return this.$store.state.serverSettings.dateFormat
+    },
+    timeFormat() {
+      return this.$store.state.serverSettings.timeFormat
     }
   },
   methods: {
+    downloadBackup(backup) {
+      this.$downloadFile(`${process.env.serverUrl}/api/backups/${backup.id}/download?token=${this.userToken}`)
+    },
     confirm() {
       this.showConfirmApply = false
+      this.isApplyingBackup = true
 
       this.$axios
         .$get(`/api/backups/${this.selectedBackup.id}/apply`)
         .then(() => {
-          this.isBackingUp = false
           location.replace('/config/backups?backup=1')
         })
         .catch((error) => {
-          this.isBackingUp = false
-          console.error('Failed', error)
-          this.$toast.error(this.$strings.ToastBackupRestoreFailed)
+          console.error('Failed to apply backup', error)
+          const errorMsg = error.response.data || this.$strings.ToastBackupRestoreFailed
+          this.$toast.error(errorMsg)
+        })
+        .finally(() => {
+          this.isApplyingBackup = false
         })
     },
     deleteBackupClick(backup) {
-      if (confirm(this.$getString('MessageConfirmDeleteBackup', [backup.datePretty]))) {
+      if (confirm(this.$getString('MessageConfirmDeleteBackup', [this.$formatDatetime(backup.createdAt, this.dateFormat, this.timeFormat)]))) {
         this.processing = true
         this.$axios
           .$delete(`/api/backups/${backup.id}`)
@@ -154,11 +171,12 @@ export default {
       this.$axios
         .$get('/api/backups')
         .then((data) => {
+          this.$emit('loaded', data)
           this.setBackups(data.backups || [])
         })
         .catch((error) => {
           console.error('Failed to load backups', error)
-          this.$toast.error('Failed to load backups')
+          this.$toast.error(this.$strings.ToastFailedToLoadData)
         })
         .finally(() => {
           this.processing = false
@@ -168,8 +186,7 @@ export default {
   mounted() {
     this.loadBackups()
     if (this.$route.query.backup) {
-      this.$toast.success('Backup applied successfully')
-      this.$router.replace('/config')
+      this.$toast.success(this.$strings.ToastBackupAppliedSuccess)
     }
   }
 }

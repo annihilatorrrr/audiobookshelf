@@ -10,9 +10,28 @@
         <p class="text-lg font-semibold mb-4">{{ $strings.HeaderRSSFeedIsOpen }}</p>
 
         <div class="w-full relative">
-          <ui-text-input v-model="currentFeed.feedUrl" readonly />
+          <ui-text-input :value="feedUrl" readonly show-copy />
+        </div>
 
-          <span class="material-icons absolute right-2 bottom-2 p-0.5 text-base transition-transform duration-100 text-gray-300 hover:text-white transform hover:scale-125 cursor-pointer" @click="copyToClipboard(currentFeed.feedUrl)">content_copy</span>
+        <div v-if="currentFeed.meta" class="mt-5">
+          <div class="flex py-0.5">
+            <div class="w-48">
+              <span class="text-white text-opacity-60 uppercase text-sm">{{ $strings.LabelRSSFeedPreventIndexing }}</span>
+            </div>
+            <div>{{ currentFeed.meta.preventIndexing ? 'Yes' : 'No' }}</div>
+          </div>
+          <div v-if="currentFeed.meta.ownerName" class="flex py-0.5">
+            <div class="w-48">
+              <span class="text-white text-opacity-60 uppercase text-sm">{{ $strings.LabelRSSFeedCustomOwnerName }}</span>
+            </div>
+            <div>{{ currentFeed.meta.ownerName }}</div>
+          </div>
+          <div v-if="currentFeed.meta.ownerEmail" class="flex py-0.5">
+            <div class="w-48">
+              <span class="text-white text-opacity-60 uppercase text-sm">{{ $strings.LabelRSSFeedCustomOwnerEmail }}</span>
+            </div>
+            <div>{{ currentFeed.meta.ownerEmail }}</div>
+          </div>
         </div>
       </div>
       <div v-else class="w-full">
@@ -22,6 +41,7 @@
           <ui-text-input-with-label v-model="newFeedSlug" :label="$strings.LabelRSSFeedSlug" />
           <p class="text-xs text-gray-400 py-0.5 px-1">{{ $getString('MessageFeedURLWillBe', [demoFeedUrl]) }}</p>
         </div>
+        <widgets-rss-feed-metadata-builder v-model="metadataDetails" />
 
         <p v-if="isHttp" class="w-full pt-2 text-warning text-xs">{{ $strings.NoteRSSFeedPodcastAppsHttps }}</p>
         <p v-if="hasEpisodesWithoutPubDate" class="w-full pt-2 text-warning text-xs">{{ $strings.NoteRSSFeedPodcastAppsPubDate }}</p>
@@ -41,7 +61,12 @@ export default {
     return {
       processing: false,
       newFeedSlug: null,
-      currentFeed: null
+      currentFeed: null,
+      metadataDetails: {
+        preventIndexing: true,
+        ownerName: '',
+        ownerEmail: ''
+      }
     }
   },
   watch: {
@@ -84,8 +109,11 @@ export default {
     userIsAdminOrUp() {
       return this.$store.getters['user/getIsAdminOrUp']
     },
+    feedUrl() {
+      return this.currentFeed ? `${window.origin}${this.$config.routerBasePath}${this.currentFeed.feedUrl}` : ''
+    },
     demoFeedUrl() {
-      return `${window.origin}/feed/${this.newFeedSlug}`
+      return `${window.origin}${this.$config.routerBasePath}/feed/${this.newFeedSlug}`
     },
     isHttp() {
       return window.origin.startsWith('http://')
@@ -94,22 +122,25 @@ export default {
   methods: {
     openFeed() {
       if (!this.newFeedSlug) {
-        this.$toast.error('Must set a feed slug')
+        this.$toast.error(this.$strings.ToastSlugRequired)
         return
       }
 
       const sanitized = this.$sanitizeSlug(this.newFeedSlug)
       if (this.newFeedSlug !== sanitized) {
         this.newFeedSlug = sanitized
-        this.$toast.warning('Slug had to be modified - Run again')
+        this.$toast.warning(this.$strings.ToastSlugMustChange)
         return
       }
 
+      this.processing = true
+
       const payload = {
         serverAddress: window.origin,
-        slug: this.newFeedSlug
+        slug: this.newFeedSlug,
+        metadataDetails: this.metadataDetails
       }
-      if (this.$isDev) payload.serverAddress = `http://localhost:3333${this.$config.routerBasePath}`
+      if (this.$isDev) payload.serverAddress = process.env.serverUrl
 
       console.log('Payload', payload)
       this.$axios
@@ -123,9 +154,9 @@ export default {
           const errorMsg = error.response ? error.response.data : null
           this.$toast.error(errorMsg || 'Failed to open RSS Feed')
         })
-    },
-    copyToClipboard(str) {
-      this.$copyToClipboard(str, this)
+        .finally(() => {
+          this.processing = false
+        })
     },
     closeFeed() {
       this.processing = true
